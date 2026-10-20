@@ -1,24 +1,16 @@
 # Viabilidad Técnica de Fuentes de Datos — BuyHub
 
-Documento vivo para registrar qué comercios electrónicos en Colombia pueden ser consultados por **BuyHub**, cómo exponen sus datos y qué limitaciones técnicas presentan.
+Documento de resultados obtenidos mediante el script de auditoría `spikes/spike_001_audit.py` con la referencia de prueba `G203` (Logitech G203).
 
-## 1. Criterios de Clasificación
-- **Nivel 1 (Ideal - API / JSON público):** La tienda usa plataformas (ej. API pública, VTEX, Shopify `/search/suggest.json`, WooCommerce Store API) que devuelven JSON estructurado con título, precio, SKU/referencia y enlace.
-- **Nivel 2 (Medio - HTML Estático / SSR):** El servidor devuelve el HTML completo en la primera petición (`fetch`/`curl`) y se puede extraer con un parser ligero sin ejecutar un navegador completo.
-- **Nivel 3 (Complejo - SPA / Anti-bot activo):** Requiere navegador headless (Playwright) o tiene bloqueos agresivos (Cloudflare Turnstile, Captchas). *Quedan fuera del MVP inicial.*
+## 1. Matriz de Evaluación de Tiendas (Resultados SPIKE-001)
 
-## 2. Matriz de Evaluación de Tiendas
-
-| Tienda / Fuente | URL Base | Tecnología Detectada | Método de Extracción | ¿Expone Referencia/SKU? | Nivel de Dificultad | ¿Entra al MVP? |
+| Tienda / Fuente | URL Auditada | Respuesta Obtenida | Método de Extracción Viable | ¿Expone Referencia/SKU? | Nivel de Dificultad | ¿Entra al MVP? |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| *Ej. Mercado Libre CO* | `mercadolibre.com.co` | API / Web | API / Scraping | Parcial (en ficha técnica) | Nivel 1 / 2 | Pendiente |
-| *Tienda 2 (Por definir)* | `...` | Shopify / VTEX / Woo | ... | Sí / No | ... | Pendiente |
-| *Tienda 3 (Por definir)* | `...` | ... | ... | Sí / No | ... | Pendiente |
+| **Almacenes Éxito** | `exito.com` | `206 Partial Content` (JSON directo con 10 productos) | API pública VTEX (`/api/catalog_system/pub/products/search`) | **Sí** (`productReference`, `brand`, `items.ean`) | **Nivel 1 (Bajo)** | **SÍ (Fuente #1)** |
+| **Alkosto** | `alkosto.com` | `200 OK` (`SearchBox` devuelve `products: null`; Web devuelve `1.76 MB` de HTML SSR) | Parsing de HTML SSR (`BeautifulSoup`) o consulta a API Algolia | **Parcial** (Código interno y referencia en el título) | **Nivel 1-2 (Bajo/Medio)** | **SÍ (Fuente #2)** |
+| **Mercado Libre CO** | `mercadolibre.com.co` | API sin token: `403 Forbidden`. Web: `200 OK` pero devuelve reto WAF de `25 KB` (0 tarjetas) | Requiere **API Oficial con OAuth Token** o cliente con huella TLS (`curl_cffi`) | **Sí** (En atributos de API oficial) | **Nivel 2 (Medio)** | **SÍ (Con Token API / Fase 1.2)** |
+| **Amazon** | `amazon.com` | Descartado en pre-auditoría (PA-API exige ventas previas y bloqueo TLS estricto) | Posponer hasta contar con credenciales PA-API | **Sí** (ASIN) | **Nivel 3 (Alto)** | **NO (Fase 2)** |
 
-## 3. Hallazgos de Estructura de Títulos (Muestras Reales)
-*(Aquí pegaremos ejemplos reales durante el SPIKE-002 para diseñar el filtro entre producto principal vs. accesorios)*
-
-- **Referencia de prueba:** `[Ej. LS2 FF808]`
-  - Muestra Tienda 1: `...`
-  - Muestra Tienda 2: `...`
-  - Ruido detectado (accesorios/repuestos): `...`
+## 2. Conclusiones y Decisiones para el Desarrollo
+1. **Primera integración del MVP:** Comenzar el desarrollo con **Almacenes Éxito** (JSON VTEX directo) y **Alkosto** (HTML SSR), ya que no presentan bloqueos anti-bot ante peticiones HTTP estándar.
+2. **Estrategia para Mercado Libre:** No usar `requests` plano contra el HTML de `listado.mercadolibre.com.co` debido al bloqueo silencioso (página de 25 KB). Se implementará en un adaptador separado usando `curl_cffi` o credenciales de Mercado Libre Developers.
